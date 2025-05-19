@@ -1,0 +1,39 @@
+# Requirements
+- Node.js v18.12 or higher required for pnpm
+- Current Node.js version: v18.20.8 (LTS)
+- pnpm version: v10.4.1
+
+# Package Manager
+Use pnpm instead of npm for package management
+Example: pnpm install @radix-ui/react-slot
+
+# Project Structure
+- /app - Next.js app directory
+- /components - Reusable UI components
+- /lib - Utility functions and shared code
+
+# Development
+- Run development server: pnpm dev
+- Build for production: pnpm build
+- Start production server: pnpm start
+
+# Dependencies
+Key dependencies:
+- @radix-ui/react-slot
+- class-variance-authority
+- clsx
+- tailwind-merge
+- date-fns
+- tailwindcss
+- postcss
+- autoprefixer
+
+# Styling
+- Uses Tailwind CSS for styling
+- Custom theme variables in globals.css
+- Component-specific styles in respective component files
+
+# TypeScript
+- Strict TypeScript configuration
+- Component props are properly typed
+- Use proper type imports from React and Next.js 

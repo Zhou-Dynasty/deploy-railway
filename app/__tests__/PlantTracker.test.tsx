@@ -3,6 +3,24 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlantTracker from '../page';
 
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: { [key: string]: string } = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    clear: () => {
+      store = {};
+    }
+  };
+})();
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock
+});
+
 // Mock the data
 jest.mock('../data/plants', () => ({
   commonHouseplants: ['Monstera Deliciosa', 'Monstera Adansonii', 'Snake Plant', 'Peace Lily']
@@ -10,10 +28,113 @@ jest.mock('../data/plants', () => ({
 
 describe('PlantTracker', () => {
   beforeEach(() => {
-    render(<PlantTracker />);
+    localStorage.clear();
+  });
+
+  describe('LocalStorage persistence', () => {
+    it('loads plants from localStorage on mount', async () => {
+      const { unmount } = render(<PlantTracker />);
+      // Setup: Add a plant and unmount
+      const input = screen.getByPlaceholderText('Search for a plant...');
+      const addButton = screen.getByRole('button', { name: 'Add' });
+      
+      await userEvent.type(input, 'Monstera Deliciosa');
+      await userEvent.click(addButton);
+      
+      // Unmount and remount
+      unmount();
+      render(<PlantTracker />);
+
+      // Verify only one plant card is present
+      const plantCards = screen.getAllByText('🌿 Monstera Deliciosa');
+      expect(plantCards.length).toBe(1);
+    });
+
+    it('persists watering dates', async () => {
+      const { unmount } = render(<PlantTracker />);
+      // Add a plant
+      const input = screen.getByPlaceholderText('Search for a plant...');
+      const addButton = screen.getByRole('button', { name: 'Add' });
+      
+      await userEvent.type(input, 'Monstera Deliciosa');
+      await userEvent.click(addButton);
+
+      // Water the plant
+      const waterButton = screen.getByText('Water');
+      await userEvent.click(waterButton);
+
+      // Unmount and remount
+      unmount();
+      render(<PlantTracker />);
+
+      // Verify only one watering date is present and it's not 'Never'
+      const watered = screen.getAllByText(/Last watered:/);
+      expect(watered.length).toBe(1);
+      expect(screen.queryByText('Last watered: Never')).not.toBeInTheDocument();
+    });
+
+    it('persists multiple plants with their states', async () => {
+      const { unmount } = render(<PlantTracker />);
+      // Add first plant
+      const input = screen.getByPlaceholderText('Search for a plant...');
+      const addButton = screen.getByRole('button', { name: 'Add' });
+      
+      await userEvent.type(input, 'Monstera Deliciosa');
+      await userEvent.click(addButton);
+
+      // Add second plant
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Snake Plant');
+      await userEvent.click(addButton);
+
+      // Water first plant
+      const waterButtons = screen.getAllByText('Water');
+      await userEvent.click(waterButtons[0]);
+
+      // Unmount and remount
+      unmount();
+      render(<PlantTracker />);
+
+      // Verify both plants are present with correct states
+      const monsteraCards = screen.getAllByText('🌿 Monstera Deliciosa');
+      const snakeCards = screen.getAllByText('🌿 Snake Plant');
+      expect(monsteraCards.length).toBe(1);
+      expect(snakeCards.length).toBe(1);
+      // There should be one 'Last watered: Never' (Snake Plant)
+      const never = screen.getAllByText('Last watered: Never');
+      expect(never.length).toBe(1);
+      // There should be one watered date (Monstera)
+      const watered = screen.getAllByText(/Last watered:/);
+      expect(watered.length).toBe(2); // Both have 'Last watered:', but only one is not 'Never'
+    });
+
+    it('persists plant removal', async () => {
+      const { unmount } = render(<PlantTracker />);
+      // Add a plant
+      const input = screen.getByPlaceholderText('Search for a plant...');
+      const addButton = screen.getByRole('button', { name: 'Add' });
+      
+      await userEvent.type(input, 'Monstera Deliciosa');
+      await userEvent.click(addButton);
+
+      // Remove the plant
+      const removeButton = screen.getByText('Remove');
+      await userEvent.click(removeButton);
+
+      // Unmount and remount
+      unmount();
+      render(<PlantTracker />);
+
+      // Verify plant is still removed
+      expect(screen.queryByText('🌿 Monstera Deliciosa')).not.toBeInTheDocument();
+    });
   });
 
   describe('Autocomplete functionality', () => {
+    beforeEach(() => {
+      render(<PlantTracker />);
+    });
+
     it('shows dropdown when typing in the input', async () => {
       const input = screen.getByPlaceholderText('Search for a plant...');
       await userEvent.type(input, 'monstera');

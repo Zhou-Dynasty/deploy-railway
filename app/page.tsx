@@ -22,6 +22,23 @@ export default function PlantTracker() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Load plants from localStorage on mount
+  useEffect(() => {
+    const savedPlants = localStorage.getItem('plants');
+    if (savedPlants) {
+      const parsedPlants = JSON.parse(savedPlants).map((plant: any) => ({
+        ...plant,
+        lastWatered: plant.lastWatered ? new Date(plant.lastWatered) : null
+      }));
+      setPlants(parsedPlants);
+    }
+  }, []);
+
+  // Save plants to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('plants', JSON.stringify(plants));
+  }, [plants]);
+
   // Ensure unique plant names for suggestions
   const uniqueHouseplants = Array.from(new Set(commonHouseplants));
 
@@ -55,6 +72,11 @@ export default function PlantTracker() {
     setPlants(updated);
   };
 
+  const removePlant = (index: number) => {
+    const updated = plants.filter((_, i) => i !== index);
+    setPlants(updated);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
       e.preventDefault();
@@ -84,14 +106,14 @@ export default function PlantTracker() {
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">🌱 Plant Watering Tracker</h1>
-      <div className="flex gap-2 mb-6">
+    <div className="p-2 sm:p-4 max-w-xl mx-auto w-full min-h-screen bg-background">
+      <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center">🌱 Plant Watering Tracker</h1>
+      <div className="flex flex-col sm:flex-row gap-2 mb-6">
         <div className="relative flex-1">
           <div className="relative">
             <Input
               ref={inputRef}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-md border border-input bg-background px-3 py-3 text-base sm:text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Search for a plant..."
               value={newPlant}
               onChange={(e) => {
@@ -102,11 +124,11 @@ export default function PlantTracker() {
               onKeyDown={handleKeyDown}
             />
             <button
-              className="absolute right-2 top-2.5"
+              className="absolute right-2 top-3 sm:top-2.5 p-1"
               onClick={() => setOpen(!open)}
               data-testid="chevron"
             >
-              <ChevronsUpDown className="h-4 w-4 opacity-50" />
+              <ChevronsUpDown className="h-5 w-5 sm:h-4 sm:w-4 opacity-50" />
             </button>
           </div>
           {open && filteredPlants.length > 0 && (
@@ -127,7 +149,7 @@ export default function PlantTracker() {
                   aria-selected={activeIndex === index}
                   data-testid={`suggestion-${plant}`}
                   className={cn(
-                    "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
+                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 sm:py-1.5 text-base sm:text-sm outline-none",
                     activeIndex === index && "bg-accent text-accent-foreground"
                   )}
                 >
@@ -140,20 +162,23 @@ export default function PlantTracker() {
             </div>
           )}
         </div>
-        <Button onClick={addPlant}>Add</Button>
+        <Button className="w-full sm:w-auto py-3 sm:py-2 text-base sm:text-sm" onClick={addPlant}>Add</Button>
       </div>
 
       <div className="grid gap-4">
         {plants.map((plant, i) => (
-          <Card key={i}>
-            <CardContent className="p-4 flex justify-between items-center">
+          <Card key={i} className="rounded-xl border bg-card text-card-foreground shadow">
+            <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
               <div>
-                <div className="font-medium text-lg">🌿 {plant.name}</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="font-medium text-lg sm:text-base break-words">🌿 {plant.name}</div>
+                <div className="text-sm sm:text-xs text-muted-foreground">
                   Last watered: {plant.lastWatered ? format(plant.lastWatered, 'PPPpp') : 'Never'}
                 </div>
               </div>
-              <Button variant="outline" onClick={() => waterPlant(i)}>Water</Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => waterPlant(i)}>Water</Button>
+                <Button variant="destructive" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => removePlant(i)}>Remove</Button>
+              </div>
             </CardContent>
           </Card>
         ))}

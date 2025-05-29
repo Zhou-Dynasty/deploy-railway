@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { commonHouseplants } from './data/plants';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getWateringRecommendation } from './utils/gemini';
 
 interface Plant {
   name: string;
   lastWatered: Date | null;
+  wateringFrequency?: string;
 }
 
 export default function PlantTracker() {
@@ -19,6 +21,7 @@ export default function PlantTracker() {
   const [newPlant, setNewPlant] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [loadingPlant, setLoadingPlant] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,11 +62,30 @@ export default function PlantTracker() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const addPlant = () => {
+  const addPlant = async () => {
     if (!newPlant.trim()) return;
-    setPlants([...plants, { name: newPlant, lastWatered: null }]);
-    setNewPlant('');
-    setOpen(false);
+    
+    const plantName = newPlant.trim();
+    setLoadingPlant(plantName);
+    
+    try {
+      const wateringFrequency = await getWateringRecommendation(plantName);
+      setPlants([...plants, { 
+        name: plantName, 
+        lastWatered: null,
+        wateringFrequency 
+      }]);
+    } catch (error) {
+      console.error('Error adding plant:', error);
+      setPlants([...plants, { 
+        name: plantName, 
+        lastWatered: null 
+      }]);
+    } finally {
+      setLoadingPlant(null);
+      setNewPlant('');
+      setOpen(false);
+    }
   };
 
   const waterPlant = (index: number) => {
@@ -95,8 +117,7 @@ export default function PlantTracker() {
         setNewPlant(selectedPlant);
         setOpen(false);
         // Add the plant immediately after selecting
-        setPlants([...plants, { name: selectedPlant, lastWatered: null }]);
-        setNewPlant('');
+        addPlant();
       } else if (newPlant.trim()) {
         addPlant();
       }
@@ -162,7 +183,20 @@ export default function PlantTracker() {
             </div>
           )}
         </div>
-        <Button className="w-full sm:w-auto py-3 sm:py-2 text-base sm:text-sm" onClick={addPlant}>Add</Button>
+        <Button 
+          className="w-full sm:w-auto py-3 sm:py-2 text-base sm:text-sm" 
+          onClick={addPlant}
+          disabled={loadingPlant !== null}
+        >
+          {loadingPlant ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding...
+            </>
+          ) : (
+            'Add'
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-4">
@@ -174,6 +208,11 @@ export default function PlantTracker() {
                 <div className="text-sm sm:text-xs text-muted-foreground">
                   Last watered: {plant.lastWatered ? format(plant.lastWatered, 'PPPpp') : 'Never'}
                 </div>
+                {plant.wateringFrequency && (
+                  <div className="text-sm sm:text-xs text-muted-foreground mt-1">
+                    💧 {plant.wateringFrequency}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button variant="outline" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => waterPlant(i)}>Water</Button>

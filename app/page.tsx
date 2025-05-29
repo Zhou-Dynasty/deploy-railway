@@ -24,17 +24,19 @@ export default function PlantTracker() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [loadingPlant, setLoadingPlant] = useState<string | null>(null);
-  const [language, setLanguage] = useState<Language>(() => {
-    const savedLanguage = localStorage.getItem('language') as Language;
-    return savedLanguage || 'zh';
-  });
+  const [language, setLanguage] = useState<Language>('zh');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const t = translations[language];
 
-  // Load plants from localStorage on mount
+  // Load plants and language from localStorage on mount
   useEffect(() => {
+    const savedLanguage = localStorage.getItem('language') as Language;
+    if (savedLanguage) {
+      setLanguage(savedLanguage);
+    }
+
     const savedPlants = localStorage.getItem('plants');
     if (savedPlants) {
       const parsedPlants = JSON.parse(savedPlants).map((plant: any) => ({

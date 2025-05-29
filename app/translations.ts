@@ -13,7 +13,7 @@ export const translations = {
     neverWatered: 'Never watered',
     noSchedule: 'No watering schedule',
     needsWatering: 'Needs watering now!',
-    daysUntilWatering: 'Days until next watering:',
+    daysUntilWatering: 'Days until next watering: {days}',
   },
   zh: {
     title: '🌱 植物浇水追踪器',
@@ -27,6 +27,6 @@ export const translations = {
     neverWatered: '从未浇水',
     noSchedule: '无浇水计划',
     needsWatering: '现在需要浇水！',
-    daysUntilWatering: '距离下次浇水还有:',
+    daysUntilWatering: '距离下次浇水还有: {days}天',
   },
 }; 

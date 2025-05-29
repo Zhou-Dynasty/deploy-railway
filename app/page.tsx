@@ -24,7 +24,10 @@ export default function PlantTracker() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [loadingPlant, setLoadingPlant] = useState<string | null>(null);
-  const [language, setLanguage] = useState<Language>('zh');
+  const [language, setLanguage] = useState<Language>(() => {
+    const savedLanguage = localStorage.getItem('language') as Language;
+    return savedLanguage || 'zh';
+  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +45,14 @@ export default function PlantTracker() {
     }
   }, []);
 
-  // Save plants to localStorage whenever they change
+  // Save plants and language to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('plants', JSON.stringify(plants));
   }, [plants]);
+
+  useEffect(() => {
+    localStorage.setItem('language', language);
+  }, [language]);
 
   // Select the correct plant list based on language
   const houseplants = language === 'zh' ? zhHouseplants : enHouseplants;
@@ -80,7 +87,7 @@ export default function PlantTracker() {
     if (!plantName) return;
     setLoadingPlant(plantName);
     try {
-      const wateringInfo = await getWateringRecommendation(plantName);
+      const wateringInfo = await getWateringRecommendation(plantName, language);
       setPlants([...plants, { 
         name: plantName, 
         lastWatered: null,
@@ -166,10 +173,10 @@ export default function PlantTracker() {
     }
     
     if (daysUntil <= 2) {
-      return { text: `${t.daysUntilWatering} ${daysUntil}`, className: 'text-orange-500' };
+      return { text: t.daysUntilWatering.replace('{days}', daysUntil.toString()), className: 'text-orange-500' };
     }
     
-    return { text: `${t.daysUntilWatering} ${daysUntil}`, className: 'text-green-500' };
+    return { text: t.daysUntilWatering.replace('{days}', daysUntil.toString()), className: 'text-green-500' };
   };
 
   return (

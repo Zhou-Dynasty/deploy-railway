@@ -364,7 +364,7 @@ describe('PlantTracker', () => {
       mockDate('2024-03-20T12:00:00Z');
       unmount();
       render(<PlantTracker />);
-      const expectedText = `${translations.zh.daysUntilWatering} 2`;
+      const expectedText = translations.zh.daysUntilWatering.replace('{days}', '2');
       await screen.findByText(expectedText);
       expect(screen.getByText(expectedText)).toBeInTheDocument();
     });
@@ -383,7 +383,7 @@ describe('PlantTracker', () => {
       mockDate('2024-03-20T12:00:00Z');
       unmount();
       render(<PlantTracker />);
-      const expectedText = `${translations.zh.daysUntilWatering} 5`;
+      const expectedText = translations.zh.daysUntilWatering.replace('{days}', '5');
       await screen.findByText(expectedText);
       expect(screen.getByText(expectedText)).toBeInTheDocument();
     });
@@ -413,8 +413,9 @@ describe('PlantTracker', () => {
       await screen.findByText(translations.zh.needsWatering);
       expect(screen.getByText(translations.zh.needsWatering)).toBeInTheDocument();
       // Snake Plant should show "7 days until next watering"
-      await screen.findByText(`${translations.zh.daysUntilWatering} 7`);
-      expect(screen.getByText(`${translations.zh.daysUntilWatering} 7`)).toBeInTheDocument();
+      const expectedText = translations.zh.daysUntilWatering.replace('{days}', '7');
+      await screen.findByText(expectedText);
+      expect(screen.getByText(expectedText)).toBeInTheDocument();
     });
 
     it('persists watering schedule after page reload', async () => {

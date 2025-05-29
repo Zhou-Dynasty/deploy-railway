@@ -5,15 +5,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { commonHouseplants } from './data/plants';
+import { commonHouseplants as enHouseplants } from './data/plants.en';
+import { commonHouseplants as zhHouseplants } from './data/plants.zh';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getWateringRecommendation } from './utils/gemini';
+import { getWateringRecommendation, WateringInfo } from './utils/gemini';
+import { translations, Language } from './translations';
 
 interface Plant {
   name: string;
   lastWatered: Date | null;
-  wateringFrequency?: string;
+  wateringInfo?: WateringInfo;
 }
 
 export default function PlantTracker() {
@@ -22,8 +24,11 @@ export default function PlantTracker() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [loadingPlant, setLoadingPlant] = useState<string | null>(null);
+  const [language, setLanguage] = useState<Language>('zh');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const t = translations[language];
 
   // Load plants from localStorage on mount
   useEffect(() => {
@@ -42,8 +47,16 @@ export default function PlantTracker() {
     localStorage.setItem('plants', JSON.stringify(plants));
   }, [plants]);
 
+  // Select the correct plant list based on language
+  const houseplants = language === 'zh' ? zhHouseplants : enHouseplants;
+
   // Ensure unique plant names for suggestions
-  const uniqueHouseplants = Array.from(new Set(commonHouseplants));
+  const uniqueHouseplants = Array.from(new Set(houseplants));
+
+  // For displaying plant names in the current language
+  const displayPlantName = (name: string) => {
+    return name;
+  };
 
   const filteredPlants = uniqueHouseplants.filter((plant) =>
     plant.toLowerCase().includes(newPlant.toLowerCase())
@@ -62,21 +75,18 @@ export default function PlantTracker() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const addPlant = async () => {
-    if (!newPlant.trim()) return;
-    
-    const plantName = newPlant.trim();
+  const addPlant = async (plantNameOverride?: string) => {
+    const plantName = (plantNameOverride ?? newPlant).trim();
+    if (!plantName) return;
     setLoadingPlant(plantName);
-    
     try {
-      const wateringFrequency = await getWateringRecommendation(plantName);
+      const wateringInfo = await getWateringRecommendation(plantName);
       setPlants([...plants, { 
         name: plantName, 
         lastWatered: null,
-        wateringFrequency 
+        wateringInfo 
       }]);
     } catch (error) {
-      console.error('Error adding plant:', error);
       setPlants([...plants, { 
         name: plantName, 
         lastWatered: null 
@@ -100,46 +110,92 @@ export default function PlantTracker() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
+    if (["ArrowDown", "ArrowUp"].includes(e.key)) {
       e.preventDefault();
       if (!open) setOpen(true);
-      
-      const newIndex = activeIndex === null ? 0 : 
-        e.key === 'ArrowDown' 
+      const newIndex = activeIndex === null ? 0 :
+        e.key === "ArrowDown"
           ? (activeIndex + 1) % filteredPlants.length
           : (activeIndex - 1 + filteredPlants.length) % filteredPlants.length;
-      
       setActiveIndex(newIndex);
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (open && activeIndex !== null && filteredPlants[activeIndex]) {
         const selectedPlant = filteredPlants[activeIndex];
         setNewPlant(selectedPlant);
         setOpen(false);
-        // Add the plant immediately after selecting
-        addPlant();
+        // Add the plant immediately after selecting, using the selected suggestion
+        addPlant(selectedPlant);
       } else if (newPlant.trim()) {
         addPlant();
       }
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setOpen(false);
     }
   };
 
+  const getDaysUntilNextWatering = (plant: Plant): number | null => {
+    if (!plant.lastWatered || !plant.wateringInfo) {
+      return null;
+    }
+    
+    const lastWatered = new Date(plant.lastWatered);
+    const nextWatering = new Date(lastWatered);
+    nextWatering.setDate(lastWatered.getDate() + plant.wateringInfo.frequency);
+    
+    const today = new Date();
+    const diffTime = nextWatering.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  };
+
+  const getWateringStatus = (plant: Plant): { text: string; className: string } => {
+    const daysUntil = getDaysUntilNextWatering(plant);
+    
+    if (!plant.lastWatered) {
+      return { text: t.neverWatered, className: 'text-yellow-500' };
+    }
+    
+    if (daysUntil === null) {
+      return { text: t.noSchedule, className: 'text-gray-500' };
+    }
+    
+    if (daysUntil <= 0) {
+      return { text: t.needsWatering, className: 'text-red-500' };
+    }
+    
+    if (daysUntil <= 2) {
+      return { text: `${t.daysUntilWatering} ${daysUntil}`, className: 'text-orange-500' };
+    }
+    
+    return { text: `${t.daysUntilWatering} ${daysUntil}`, className: 'text-green-500' };
+  };
+
   return (
     <div className="p-2 sm:p-4 max-w-xl mx-auto w-full min-h-screen bg-background">
-      <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center">🌱 Plant Watering Tracker</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-center">{t.title}</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+        >
+          {language === 'en' ? '中文' : 'English'}
+        </Button>
+      </div>
       <div className="flex flex-col sm:flex-row gap-2 mb-6">
         <div className="relative flex-1">
           <div className="relative">
             <Input
               ref={inputRef}
               className="w-full rounded-md border border-input bg-background px-3 py-3 text-base sm:text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Search for a plant..."
+              placeholder={t.searchPlaceholder}
               value={newPlant}
+              onFocus={() => setOpen(true)}
               onChange={(e) => {
                 setNewPlant(e.target.value);
-                setOpen(e.target.value.trim() !== '');
+                setOpen(true);
                 setActiveIndex(null);
               }}
               onKeyDown={handleKeyDown}
@@ -158,6 +214,7 @@ export default function PlantTracker() {
               className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md"
               style={{ maxHeight: '300px', overflowY: 'auto' }}
               role="listbox"
+              aria-label="Plant suggestions"
             >
               {filteredPlants.map((plant, index) => (
                 <div
@@ -185,16 +242,16 @@ export default function PlantTracker() {
         </div>
         <Button 
           className="w-full sm:w-auto py-3 sm:py-2 text-base sm:text-sm" 
-          onClick={addPlant}
+          onClick={() => addPlant()}
           disabled={loadingPlant !== null}
         >
           {loadingPlant ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Adding...
+              {t.addingButton}
             </>
           ) : (
-            'Add'
+            t.addButton
           )}
         </Button>
       </div>
@@ -204,19 +261,22 @@ export default function PlantTracker() {
           <Card key={i} className="rounded-xl border bg-card text-card-foreground shadow">
             <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
               <div>
-                <div className="font-medium text-lg sm:text-base break-words">🌿 {plant.name}</div>
+                <div className="font-medium text-lg sm:text-base break-words">🌿 {displayPlantName(plant.name)}</div>
                 <div className="text-sm sm:text-xs text-muted-foreground">
-                  Last watered: {plant.lastWatered ? format(plant.lastWatered, 'PPPpp') : 'Never'}
+                  {t.lastWatered} {plant.lastWatered ? format(plant.lastWatered, 'PPPpp') : t.never}
                 </div>
-                {plant.wateringFrequency && (
+                {plant.wateringInfo && (
                   <div className="text-sm sm:text-xs text-muted-foreground mt-1">
-                    💧 {plant.wateringFrequency}
+                    💧 {plant.wateringInfo.description}
                   </div>
                 )}
+                <div className={`text-sm sm:text-xs mt-1 ${getWateringStatus(plant).className}`}>
+                  {getWateringStatus(plant).text}
+                </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => waterPlant(i)}>Water</Button>
-                <Button variant="destructive" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => removePlant(i)}>Remove</Button>
+                <Button variant="outline" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => waterPlant(i)}>{t.waterButton}</Button>
+                <Button variant="destructive" className="flex-1 sm:flex-none py-3 sm:py-2 text-base sm:text-sm" onClick={() => removePlant(i)}>{t.removeButton}</Button>
               </div>
             </CardContent>
           </Card>
